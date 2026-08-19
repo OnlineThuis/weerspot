@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ChevronDown, FileText, Shield, Database, Cookie, Copyright, ArrowRight, Search, Wifi, Clock, Menu as MenuIcon, X, Bell, Bookmark, User } from "lucide-react";
@@ -25,17 +25,28 @@ interface NavbarProps {
   };
 }
 
+interface GeocodeSuggestion {
+  id: string;
+  description: string;
+  mainText: string;
+  secondaryText: string;
+  lat?: number;
+  lng?: number;
+  source: "google" | "openmeteo";
+}
+
 export default function Navbar({ currentLang, dictionary }: NavbarProps) {
   const [isLegalOpen, setIsLegalOpen] = useState(false);
-  const [isDataSaver, setIsDataSaver] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [manualSuggestions, setManualSuggestions] = useState<GeocodeSuggestion[]>([]);
+  const [isManualSearchLoading, setIsManualSearchLoading] = useState(false);
   
   const { setLocation, setWeatherData, setLoading, setError } = useWeatherStore();
 
   const {
     ready,
     value,
-    suggestions: { status, data },
+    suggestions: { data },
     setValue,
     clearSuggestions,
   } = usePlacesAutocomplete({
@@ -45,18 +56,86 @@ export default function Navbar({ currentLang, dictionary }: NavbarProps) {
     debounce: 300,
   });
 
+  const hasGooglePlacesKey = Boolean(process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY);
+  const shouldUseGooglePlaces = hasGooglePlacesKey && ready;
+
+  useEffect(() => {
+    const query = value.trim();
+    if (shouldUseGooglePlaces || query.length < 3) {
+      setManualSuggestions([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(async () => {
+      try {
+        setIsManualSearchLoading(true);
+        const response = await fetch(
+          `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=6&language=en&format=json`,
+          { signal: controller.signal }
+        );
+
+        if (!response.ok) {
+          setManualSuggestions([]);
+          return;
+        }
+
+        const payload = await response.json();
+        const formatted: GeocodeSuggestion[] = (payload?.results || []).map((result: any) => ({
+          id: String(result.id),
+          description: `${result.name}, ${result.admin1 ? `${result.admin1}, ` : ""}${result.country}`,
+          mainText: result.name,
+          secondaryText: `${result.admin1 ? `${result.admin1}, ` : ""}${result.country}`,
+          lat: result.latitude,
+          lng: result.longitude,
+          source: "openmeteo",
+        }));
+        setManualSuggestions(formatted);
+      } catch {
+        setManualSuggestions([]);
+      } finally {
+        setIsManualSearchLoading(false);
+      }
+    }, 280);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timeout);
+    };
+  }, [value, shouldUseGooglePlaces]);
+
+  const placeSuggestions: GeocodeSuggestion[] = shouldUseGooglePlaces
+    ? data.map((suggestion) => ({
+        id: suggestion.place_id,
+        description: suggestion.description,
+        mainText: suggestion.structured_formatting.main_text,
+        secondaryText: suggestion.structured_formatting.secondary_text,
+        source: "google",
+      }))
+    : manualSuggestions;
+
   const handleSelect =
-    ({ description }: { description: string }) =>
+    (suggestion: GeocodeSuggestion) =>
     async () => {
-      setValue(description, false);
+      setValue(suggestion.description, false);
       clearSuggestions();
+      setManualSuggestions([]);
       setLoading(true);
 
       try {
-        const results = await getGeocode({ address: description });
-        const { lat, lng } = await getLatLng(results[0]);
+        let lat = suggestion.lat;
+        let lng = suggestion.lng;
+        if (suggestion.source === "google" || lat === undefined || lng === undefined) {
+          const results = await getGeocode({ address: suggestion.description });
+          const coords = await getLatLng(results[0]);
+          lat = coords.lat;
+          lng = coords.lng;
+        }
+        if (lat === undefined || lng === undefined) {
+          throw new Error("No coordinates found for selected place");
+        }
         
-        setLocation(lat, lng, description.split(",")[0]);
+        setLocation(lat, lng, suggestion.mainText);
         
         const { weather, uvIndex } = await fetchLiveWeather(lat, lng);
         setWeatherData(weather, uvIndex);
@@ -89,26 +168,27 @@ export default function Navbar({ currentLang, dictionary }: NavbarProps) {
             </div>
 
             {/* Desktop Search Autocomplete Dropdown */}
-            {status === "OK" && (
+            {placeSuggestions.length > 0 && (
               <div className="absolute top-full left-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-100 p-2 w-[340px] z-50">
                 <ul className="space-y-1">
-                  {data.map((suggestion) => {
-                    const {
-                      place_id,
-                      structured_formatting: { main_text, secondary_text },
-                    } = suggestion;
+                  {placeSuggestions.map((suggestion) => {
                     return (
                       <li
-                        key={place_id}
+                        key={suggestion.id}
                         onClick={handleSelect(suggestion)}
                         className="w-full flex flex-col px-3 py-2 hover:bg-blue-50 rounded-lg text-left cursor-pointer transition-colors"
                       >
-                        <span className="text-sm font-semibold text-gray-800">{main_text}</span>
-                        <span className="text-[11px] text-gray-500">{secondary_text}</span>
+                        <span className="text-sm font-semibold text-gray-800">{suggestion.mainText}</span>
+                        <span className="text-[11px] text-gray-500">{suggestion.secondaryText}</span>
                       </li>
                     );
                   })}
                 </ul>
+              </div>
+            )}
+            {!shouldUseGooglePlaces && isManualSearchLoading && value.trim().length >= 3 && (
+              <div className="absolute top-full left-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-100 px-3 py-2 w-[340px] z-50 text-xs text-gray-500">
+                Searching locations...
               </div>
             )}
           </div>

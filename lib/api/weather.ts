@@ -19,13 +19,32 @@ export async function fetchLiveWeather(lat: number, lng: number) {
         };
       }
     } else {
-      // Mock data if API key is missing
+      // Real fallback when no OpenWeather key is configured.
+      const fallbackRes = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code`
+      );
+      if (fallbackRes.ok) {
+        const fallback = await fallbackRes.json();
+        const current = fallback?.current;
+        const weatherCode = Number(current?.weather_code ?? 1);
+        const icon = weatherCode >= 51 ? "10d" : weatherCode >= 3 ? "03d" : "01d";
+        weatherData = {
+          temp: Math.round(current?.temperature_2m ?? 0),
+          description: "Live weather (Open-Meteo)",
+          icon,
+          windSpeed: Number(current?.wind_speed_10m ?? 0),
+          humidity: Number(current?.relative_humidity_2m ?? 0),
+        };
+      }
+    }
+
+    if (!weatherData) {
       weatherData = {
-        temp: 18,
-        description: "API Key Required",
+        temp: 0,
+        description: "Weather unavailable",
         icon: "02d",
-        windSpeed: 5.4,
-        humidity: 65,
+        windSpeed: 0,
+        humidity: 0,
       };
     }
 

@@ -17,53 +17,62 @@ import {
   ChevronDown,
   Menu
 } from "lucide-react";
+import { useWeatherStore } from "@/store/useWeatherStore";
 
-export default function WeatherToolbar() {
-  const [activeTool, setActiveTool] = useState("cursor");
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(100);
-  
-  // Mock Time State
-  const [timeHour, setTimeHour] = useState(14);
-  const [timeMin, setTimeMin] = useState(0);
+interface ToolButtonProps {
+  id: "cursor" | "radar" | "wind" | "temp" | "clouds";
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  label: string;
+  isActive: boolean;
+  onClick: (id: string) => void;
+  hasDropdown?: boolean;
+}
 
-  // Playback Simulation
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isPlaying) {
-      interval = setInterval(() => {
-        setTimeMin((prev) => {
-          if (prev === 45) {
-            setTimeHour((h) => (h === 23 ? 0 : h + 1));
-            return 0;
-          }
-          return prev + 15;
-        });
-      }, 500); // Ticks every 500ms
-    }
-    return () => clearInterval(interval);
-  }, [isPlaying]);
-
-  const handleZoomIn = () => setZoomLevel(z => Math.min(z + 10, 200));
-  const handleZoomOut = () => setZoomLevel(z => Math.max(z - 10, 10));
-
-  // Format time (e.g. 14:00)
-  const formattedTime = `Today, ${timeHour.toString().padStart(2, '0')}:${timeMin.toString().padStart(2, '0')}`;
-
-  const ToolButton = ({ id, icon: Icon, label, isActive, onClick, hasDropdown = false }: any) => (
-    <button 
+function ToolButton({ id, icon: Icon, label, isActive, onClick, hasDropdown = false }: ToolButtonProps) {
+  return (
+    <button
       onClick={() => onClick(id)}
       className={`shrink-0 h-8 px-2.5 rounded-md flex items-center justify-center gap-1.5 transition-all duration-200 ${
-        isActive 
-          ? 'bg-blue-50 text-blue-600 shadow-sm ring-1 ring-blue-500/20' 
-          : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+        isActive
+          ? "bg-blue-50 text-blue-600 shadow-sm ring-1 ring-blue-500/20"
+          : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
       }`}
       title={label}
     >
       <Icon className="w-[18px] h-[18px]" strokeWidth={isActive ? 2.5 : 2} />
-      {hasDropdown && <ChevronDown className={`w-3.5 h-3.5 ${isActive ? 'text-blue-500' : 'text-gray-400'}`} />}
+      {hasDropdown && <ChevronDown className={`w-3.5 h-3.5 ${isActive ? "text-blue-500" : "text-gray-400"}`} />}
     </button>
   );
+}
+
+export default function WeatherToolbar() {
+  const [activeTool, setActiveTool] = useState("cursor");
+  const {
+    activeLayer,
+    setActiveLayer,
+    isPlaying,
+    setIsPlaying,
+    timeHour,
+    timeMin,
+    tickPlayback,
+    zoomLevel,
+    zoomIn,
+    zoomOut,
+  } = useWeatherStore();
+
+  // Keep animated timeline behavior while syncing with map/weather state.
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isPlaying) {
+      interval = setInterval(() => {
+        tickPlayback();
+      }, 500); // Ticks every 500ms
+    }
+    return () => clearInterval(interval);
+  }, [isPlaying, tickPlayback]);
+
+  // Format time (e.g. 14:00)
+  const formattedTime = `Today, ${timeHour.toString().padStart(2, '0')}:${timeMin.toString().padStart(2, '0')}`;
 
   return (
     <div className="fixed top-[61px] left-0 right-0 z-40 h-12 bg-white border-b border-gray-200 flex items-center px-2 lg:px-4 text-sm select-none overflow-hidden">
@@ -80,10 +89,10 @@ export default function WeatherToolbar() {
           <ToolButton id="cursor" icon={MousePointer2} label="Select" isActive={activeTool === "cursor"} onClick={setActiveTool} hasDropdown />
           <div className="w-[1px] h-5 bg-gray-200 mx-1 shrink-0"></div>
           
-          <ToolButton id="radar" icon={Droplets} label="Radar Layer" isActive={activeTool === "radar"} onClick={setActiveTool} />
-          <ToolButton id="wind" icon={Wind} label="Wind Layer" isActive={activeTool === "wind"} onClick={setActiveTool} />
-          <ToolButton id="temp" icon={Thermometer} label="Temperature Layer" isActive={activeTool === "temp"} onClick={setActiveTool} />
-          <ToolButton id="clouds" icon={CloudRain} label="Cloud Cover" isActive={activeTool === "clouds"} onClick={setActiveTool} hasDropdown />
+          <ToolButton id="radar" icon={Droplets} label="Radar Layer" isActive={activeLayer === "radar"} onClick={setActiveLayer} />
+          <ToolButton id="wind" icon={Wind} label="Wind Layer" isActive={activeLayer === "wind"} onClick={setActiveLayer} />
+          <ToolButton id="temp" icon={Thermometer} label="Temperature Layer" isActive={activeLayer === "temp"} onClick={setActiveLayer} />
+          <ToolButton id="clouds" icon={CloudRain} label="Cloud Cover" isActive={activeLayer === "clouds"} onClick={setActiveLayer} hasDropdown />
           
           <div className="w-[1px] h-5 bg-gray-200 mx-1 shrink-0"></div>
           
@@ -100,7 +109,7 @@ export default function WeatherToolbar() {
         {/* Middle Group: Playback Controls */}
         <div className="flex items-center shrink-0 ml-4 lg:ml-0">
           <div className="flex items-center bg-gray-50 border border-gray-200 rounded-lg p-0.5 shadow-sm">
-            <button 
+            <button
               onClick={() => setIsPlaying(!isPlaying)}
               className={`h-8 px-3 rounded-md text-gray-600 hover:text-gray-900 hover:bg-white flex items-center gap-1.5 transition-all ${isPlaying ? 'bg-white shadow-sm text-blue-600' : ''}`}
             >
@@ -120,11 +129,11 @@ export default function WeatherToolbar() {
         <div className="flex items-center gap-1 shrink-0 ml-4 lg:ml-0">
           {/* Zoom Controls */}
           <div className="flex items-center bg-gray-50 border border-gray-200 rounded-lg p-0.5 shadow-sm mr-2">
-            <button onClick={handleZoomOut} className="h-8 w-8 rounded-md flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm transition-all active:scale-95">
+            <button onClick={zoomOut} className="h-8 w-8 rounded-md flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm transition-all active:scale-95">
               <ZoomOut className="w-[18px] h-[18px]" />
             </button>
             <span className="text-gray-600 text-[12px] px-2 font-semibold select-text cursor-text w-[46px] text-center tabular-nums">{zoomLevel}%</span>
-            <button onClick={handleZoomIn} className="h-8 w-8 rounded-md flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm transition-all active:scale-95">
+            <button onClick={zoomIn} className="h-8 w-8 rounded-md flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm transition-all active:scale-95">
               <ZoomIn className="w-[18px] h-[18px]" />
             </button>
           </div>

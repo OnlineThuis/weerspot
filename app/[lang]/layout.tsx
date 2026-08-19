@@ -31,6 +31,7 @@ export default async function RootLayout(
   const params = await props.params;
   const lang = params.lang as Locale;
   const dictionary = await getDictionary(lang);
+  const googlePlacesApiKey = process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY;
 
   return (
     <html
@@ -38,10 +39,12 @@ export default async function RootLayout(
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
-        <Script
-          src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY}&libraries=places`}
-          strategy="beforeInteractive"
-        />
+        {googlePlacesApiKey ? (
+          <Script
+            src={`https://maps.googleapis.com/maps/api/js?key=${googlePlacesApiKey}&libraries=places`}
+            strategy="beforeInteractive"
+          />
+        ) : null}
       </head>
       <body className="min-h-[100dvh] flex flex-col pt-[109px] bg-gray-50">
         <Navbar dictionary={dictionary.footer} currentLang={lang} />

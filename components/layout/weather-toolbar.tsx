@@ -19,6 +19,32 @@ import {
 } from "lucide-react";
 import { useWeatherStore } from "@/store/useWeatherStore";
 
+interface ToolButtonProps {
+  id: "cursor" | "radar" | "wind" | "temp" | "clouds";
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  label: string;
+  isActive: boolean;
+  onClick: (id: string) => void;
+  hasDropdown?: boolean;
+}
+
+function ToolButton({ id, icon: Icon, label, isActive, onClick, hasDropdown = false }: ToolButtonProps) {
+  return (
+    <button
+      onClick={() => onClick(id)}
+      className={`shrink-0 h-8 px-2.5 rounded-md flex items-center justify-center gap-1.5 transition-all duration-200 ${
+        isActive
+          ? "bg-blue-50 text-blue-600 shadow-sm ring-1 ring-blue-500/20"
+          : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+      }`}
+      title={label}
+    >
+      <Icon className="w-[18px] h-[18px]" strokeWidth={isActive ? 2.5 : 2} />
+      {hasDropdown && <ChevronDown className={`w-3.5 h-3.5 ${isActive ? "text-blue-500" : "text-gray-400"}`} />}
+    </button>
+  );
+}
+
 export default function WeatherToolbar() {
   const [activeTool, setActiveTool] = useState("cursor");
   const {
@@ -47,21 +73,6 @@ export default function WeatherToolbar() {
 
   // Format time (e.g. 14:00)
   const formattedTime = `Today, ${timeHour.toString().padStart(2, '0')}:${timeMin.toString().padStart(2, '0')}`;
-
-  const ToolButton = ({ id, icon: Icon, label, isActive, onClick, hasDropdown = false }: any) => (
-    <button 
-      onClick={() => onClick(id)}
-      className={`shrink-0 h-8 px-2.5 rounded-md flex items-center justify-center gap-1.5 transition-all duration-200 ${
-        isActive 
-          ? 'bg-blue-50 text-blue-600 shadow-sm ring-1 ring-blue-500/20' 
-          : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
-      }`}
-      title={label}
-    >
-      <Icon className="w-[18px] h-[18px]" strokeWidth={isActive ? 2.5 : 2} />
-      {hasDropdown && <ChevronDown className={`w-3.5 h-3.5 ${isActive ? 'text-blue-500' : 'text-gray-400'}`} />}
-    </button>
-  );
 
   return (
     <div className="fixed top-[61px] left-0 right-0 z-40 h-12 bg-white border-b border-gray-200 flex items-center px-2 lg:px-4 text-sm select-none overflow-hidden">

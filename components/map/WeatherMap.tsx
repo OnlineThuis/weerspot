@@ -9,7 +9,7 @@ import WeatherCard from "./WeatherCard";
 // This is required to make Leaflet play nicely with Next.js Server Side Rendering 
 // even when dynamically imported
 import L from "leaflet";
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete (L.Icon.Default.prototype as { _getIconUrl?: unknown })._getIconUrl;
 
 // Map Updater component to fly to new locations
 function MapFlyTo() {

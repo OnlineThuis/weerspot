@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronDown, FileText, Shield, Database, Cookie, Copyright, ArrowRight, Search, Wifi, Clock, Menu as MenuIcon, X, Bell, Bookmark, User } from "lucide-react";
+import { ChevronDown, FileText, Shield, Database, Cookie, Copyright, ArrowRight, Search, Menu as MenuIcon, X, Bell, Bookmark, User } from "lucide-react";
 import usePlacesAutocomplete, {
   getGeocode,
   getLatLng,
@@ -35,6 +35,15 @@ interface GeocodeSuggestion {
   source: "google" | "openmeteo";
 }
 
+interface OpenMeteoResult {
+  id: number;
+  name: string;
+  admin1?: string;
+  country: string;
+  latitude: number;
+  longitude: number;
+}
+
 export default function Navbar({ currentLang, dictionary }: NavbarProps) {
   const [isLegalOpen, setIsLegalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -62,7 +71,6 @@ export default function Navbar({ currentLang, dictionary }: NavbarProps) {
   useEffect(() => {
     const query = value.trim();
     if (shouldUseGooglePlaces || query.length < 3) {
-      setManualSuggestions([]);
       return;
     }
 
@@ -80,8 +88,8 @@ export default function Navbar({ currentLang, dictionary }: NavbarProps) {
           return;
         }
 
-        const payload = await response.json();
-        const formatted: GeocodeSuggestion[] = (payload?.results || []).map((result: any) => ({
+        const payload = (await response.json()) as { results?: OpenMeteoResult[] };
+        const formatted: GeocodeSuggestion[] = (payload?.results || []).map((result) => ({
           id: String(result.id),
           description: `${result.name}, ${result.admin1 ? `${result.admin1}, ` : ""}${result.country}`,
           mainText: result.name,
@@ -112,7 +120,9 @@ export default function Navbar({ currentLang, dictionary }: NavbarProps) {
         secondaryText: suggestion.structured_formatting.secondary_text,
         source: "google",
       }))
-    : manualSuggestions;
+    : value.trim().length >= 3
+      ? manualSuggestions
+      : [];
 
   const handleSelect =
     (suggestion: GeocodeSuggestion) =>
